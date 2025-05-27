@@ -1,11 +1,12 @@
 import express from 'express'
+import { registerUser } from '../controller/user.controller.js'
 
 const app = express.Router()
 
+// parsing the body
+app.use(express.json())
 
-app.get('/',(req,res)=>{
-    res.status(200).json("hii bro what app")
-})
+app.post('/register',registerUser)
 
 
 export const userRoute = app
