@@ -12,5 +12,5 @@ export const isAuthenticated = async(req,res,next)=>{
 
     const decode = await jwt.verify(token,process.env.JWT_SECRATE)
     req.user=decode
-    return res.status(200).json({success:true,message:"login success"})
+    next()
 }

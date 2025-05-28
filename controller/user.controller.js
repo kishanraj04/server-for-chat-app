@@ -38,3 +38,13 @@ export const registerUser = async (req, res) => {
   res.status(200).json({ success: true, createduser: createdUser });
 };
 
+// get my profile
+export const getMyProfile = async (req,res,next) =>{
+  try {
+    const {name} = req?.user 
+    const useris = await User.findOne({name:name})
+    return res.status(200).json({success:true,message:"user found",useris})
+  } catch (error) {
+    next(error)
+  }
+}

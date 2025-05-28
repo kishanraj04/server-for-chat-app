@@ -1,5 +1,5 @@
 import express from 'express'
-import { registerUser } from '../controller/user.controller.js'
+import { getMyProfile, registerUser } from '../controller/user.controller.js'
 import { isLogin } from '../auth/login.js'
 import { directLogin } from '../auth/directlogin.js'
 import { isAuthenticated } from '../auth/auth.js'
@@ -16,6 +16,6 @@ app.post('/login',isLogin)
 // direct login
 app.get('/direct-login',directLogin)
 //get my profile
-// app.get('/profile',isAuthenticated,getMyProfile)
+app.get('/profile',isAuthenticated,getMyProfile)
 
 export const userRoute = app
