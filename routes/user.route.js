@@ -2,7 +2,7 @@ import express from 'express'
 import { getMyProfile, registerUser } from '../controller/user.controller.js'
 import { isLogin } from '../auth/login.js'
 import { directLogin } from '../auth/directlogin.js'
-import { isAuthenticated } from '../auth/auth.js'
+import { isAuthenticated, logoutUser } from '../auth/auth.js'
 
 const app = express.Router()
 
@@ -17,5 +17,7 @@ app.post('/login',isLogin)
 app.get('/direct-login',directLogin)
 //get my profile
 app.get('/profile',isAuthenticated,getMyProfile)
+// logout
+app.get('/logout',logoutUser)
 
 export const userRoute = app

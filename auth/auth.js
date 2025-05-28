@@ -14,3 +14,16 @@ export const isAuthenticated = async(req,res,next)=>{
     req.user=decode
     next()
 }
+
+// logout user
+export const logoutUser = async(req,res,next)=>{
+    const token = req.cookies.token
+    if(!token){
+        const err = new Error()
+        err.message="user already logout"
+        err.statue=200
+        return next(err)
+    }
+    res.status(200).clearCookie("token").json({success:true,message:"user logout"});
+    
+}
