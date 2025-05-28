@@ -5,6 +5,7 @@ import { uploadAvatar } from "./middleware/upload.js";
 import './utils/createfolder.js'
 import { errorHandler } from "./middleware/errorHandler.js";
 import cookieParser from "cookie-parser";
+import { chatRoute } from "./routes/chat.route.js";
 const app = express();
 
 // parse body
@@ -13,8 +14,12 @@ app.use(express.json());
 // cookie parser
 app.use(cookieParser())
 
+
 // user route
 app.use("/api/v1/user", uploadAvatar, userRoute);
+// chat route
+app.use("/api/v1/chat",chatRoute) 
+
 
 // err handler
 app.use(errorHandler)

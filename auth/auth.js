@@ -11,6 +11,7 @@ export const isAuthenticated = async(req,res,next)=>{
     }     
 
     const decode = await jwt.verify(token,process.env.JWT_SECRATE)
+    
     req.user=decode
     next()
 }
@@ -24,6 +25,6 @@ export const logoutUser = async(req,res,next)=>{
         err.statue=200
         return next(err)
     }
-    res.status(200).clearCookie("token").json({success:true,message:"user logout"});
+    res.status(200).clearCookie("token","").json({success:true,message:"user logout"});
     
 }

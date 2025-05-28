@@ -13,7 +13,7 @@ const chatSchema = mongoose.Schema({
         type:mongoose.Types.ObjectId,
         ref:"User"
     },
-    member:[{
+    members:[{
         type:mongoose.Types.ObjectId,
         ref:"User"
     }]

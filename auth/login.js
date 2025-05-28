@@ -19,7 +19,7 @@ export const isLogin = async (req, res, next) => {
   if (!isCorrect) {
     return next(error);
   } else {
-    const token = jwt.sign({ name: name }, process.env.JWT_SECRATE);
+    const token = jwt.sign({ name: name,_id:isExistUser?._id }, process.env.JWT_SECRATE);
     res
       .status(200)
       .cookie("token", token, {
