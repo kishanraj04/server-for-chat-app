@@ -37,3 +37,4 @@ export const registerUser = async (req, res) => {
   const createdUser = await User.create({ ...body, avatar });
   res.status(200).json({ success: true, createduser: createdUser });
 };
+

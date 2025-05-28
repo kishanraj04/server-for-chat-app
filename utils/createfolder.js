@@ -5,9 +5,9 @@ import path from 'path';
 const folderPath = path.join('.', 'uploads'); 
 
 async function ensureUploadsFolder() {
-  if (!fsSync.existsSync(folderPath)) {  // check if folder does NOT exist
+  if (!fsSync.existsSync(folderPath)) {  
     try {
-      await fs.mkdir(folderPath, { recursive: true });  // create folder including parents if needed
+      await fs.mkdir(folderPath, { recursive: true });  
       console.log('Folder created:', folderPath);
     } catch (error) {
       console.error('Error creating folder:', error);
