@@ -66,3 +66,23 @@ export const getMyChats = async (req, res, next) => {
   res.status(200).json({ success: true, transformchats });
 };
 
+// get my groups
+export const getMyGroups = async(req,res,next) =>{
+    const mygroup = await Chat.find({
+        creator:req?.user?._id,
+        members:req?.user?._id,
+        groupchat:true
+    }).populate("members","name avatar")
+
+
+    const transformdata = mygroup.slice(0,3)?.map(({_id,members,user,groupchat})=>{
+        return {
+            _id,
+            user,
+            groupchat,
+            avatar:members.slice(0,3).map(({avatar})=>avatar?.url)
+        }
+    })
+    
+    res.status(200).json({success:true,transformdata})
+}
