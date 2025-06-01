@@ -1,11 +1,13 @@
 import { event } from "../constants/events.js";
 import { otherUser } from "../lib/helper.js";
 import { Chat } from "../models/chat.model.js";
+import { User } from "../models/user.model.js";
+import { emitEvent } from "../utils/chat.features.js";
 
 // group chat
 export const groupChat = async (req, res, next) => {
   try {
-    const { name, members } = req?.body;
+    const { groupname, members } = req?.body;
     const you = req?.user;
     if (members?.length < 2) {
       const err = new Error();
@@ -17,6 +19,7 @@ export const groupChat = async (req, res, next) => {
     const allmembers = [...members, you?._id];
 
     const createdGroup = await Chat.create({
+        groupname,
       user: you?.name,
       groupchat: true,
       members: allmembers,
@@ -67,22 +70,86 @@ export const getMyChats = async (req, res, next) => {
 };
 
 // get my groups
-export const getMyGroups = async(req,res,next) =>{
-    const mygroup = await Chat.find({
-        creator:req?.user?._id,
-        members:req?.user?._id,
-        groupchat:true
-    }).populate("members","name avatar")
+export const getMyGroups = async (req, res, next) => {
+  const mygroup = await Chat.find({
+    creator: req?.user?._id,
+    members: req?.user?._id,
+    groupchat: true,
+  }).populate("members", "name avatar");
 
+  const transformdata = mygroup
+    .slice(0, 3)
+    ?.map(({ _id, members, user, groupchat }) => {
+      return {
+        _id,
+        user,
+        groupchat,
+        avatar: members.slice(0, 3).map(({ avatar }) => avatar?.url),
+      };
+    });
 
-    const transformdata = mygroup.slice(0,3)?.map(({_id,members,user,groupchat})=>{
-        return {
-            _id,
-            user,
-            groupchat,
-            avatar:members.slice(0,3).map(({avatar})=>avatar?.url)
-        }
-    })
-    
-    res.status(200).json({success:true,transformdata})
-}
+  res.status(200).json({ success: true, transformdata });
+};
+
+// Add members to a group chat
+export const addMember = async (req, res, next) => {
+  const { chatId, newMembers } = req.body;
+
+  // Validate members input
+  if (!newMembers || newMembers.length < 1) {
+    const err = new Error("Please provide members");
+    err.status = 404;
+    return next(err);
+  }
+
+  const chat = await Chat.findById(chatId);
+  if (!chat) {
+    const err = new Error("Chat not found");
+    err.status = 404;
+    return next(err);
+  }
+
+  if (!chat.groupchat) {
+    const err = new Error("Not a group chat");
+    err.status = 400;
+    return next(err);
+  }
+
+  // Only the creator can add members
+  if (chat.creator.toString() !== req.user._id.toString()) {
+    const err = new Error("Not allowed to add members");
+    err.status = 403;
+    return next(err);
+  }
+
+  // Fetch user data for new members
+  const newMembersData = await Promise.all(
+    newMembers.map(id => User.findById(id, "name _id"))
+  );
+
+  // Remove duplicates: keep only those not already in chat.members
+  const existingMemberIds = chat.members.map(id => id.toString());
+
+  const uniqueMembersToAdd = newMembersData
+    .filter(user => user && !existingMemberIds.includes(user._id.toString()))
+    .map(user => user._id);
+
+  if (uniqueMembersToAdd.length === 0) {
+    return res.status(200).json({ success: false, message: "No new members added. All are already in the chat." });
+  }
+
+  // Add unique new members
+  chat.members.push(...uniqueMembersToAdd);
+  await chat.save();
+
+  const addedUsernames = newMembersData
+    .filter(user => uniqueMembersToAdd.includes(user._id))
+    .map(user => user.name)
+    .join(", ");
+
+  // Emit socket events
+  emitEvent(req, "send", chat.members, `New user(s) ${addedUsernames} joined`);
+  emitEvent(req, "refetch", chat.members);
+
+  res.status(200).json({ success: true, chat, message: "Members added successfully" });
+};

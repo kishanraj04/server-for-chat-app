@@ -1,5 +1,5 @@
 import express from 'express'
-import { getMyChats, getMyGroups, groupChat } from '../controller/chat.controller.js';
+import { addMember, getMyChats, getMyGroups, groupChat } from '../controller/chat.controller.js';
 import { isAuthenticated } from '../auth/auth.js';
 
 const app = express.Router()
@@ -13,6 +13,7 @@ app.get('/my-chats',isAuthenticated,getMyChats)
 // get my groups
 app.get("/my-groups",isAuthenticated,getMyGroups)
 
-
+// add memebers
+app.put("/add-members",isAuthenticated,addMember)
 
 export const chatRoute = app;
