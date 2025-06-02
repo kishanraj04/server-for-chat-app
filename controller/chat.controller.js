@@ -153,3 +153,31 @@ export const addMember = async (req, res, next) => {
 
   res.status(200).json({ success: true, chat, message: "Members added successfully" });
 };
+
+// remove members from group
+export const removeMember = async(req,res,next)=>{
+  const {chatId,userId} = req?.body
+  try {
+    const group = await Chat.findById({_id:chatId})
+    const username = await User.findById({_id:userId},"name")
+    if(!group){
+      return res.status(404).json({success:false,message:"group not found"})
+    }
+    if(!userId || !chatId){
+      return res.status(404).json({success:false,message:"something missing"})
+    }
+    if(group?.members?.length<=3){
+      return res.status(500).json({success:false,message:"group at least have 3 member"})
+    }
+    group.members = group?.members?.filter((id)=>id?.toString()!=userId?.toString())
+    await group.save()
+
+    emitEvent(req,"alert",group?.members,`user ${username} is removed`)
+    
+    emitEvent(req,"refetch",group?.members)
+
+    res.status(200).json({success:true,message:"member deleted",group})
+  } catch (error) {
+    res.status(500).json({success:false,message:error?.message})
+  }
+}
