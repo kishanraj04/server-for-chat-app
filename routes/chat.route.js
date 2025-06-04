@@ -1,5 +1,5 @@
 import express from 'express'
-import { addMember, getChatDetails, getMyChats, getMyGroups, groupChat, leaveFromGroup, removeMember, sendAttachment } from '../controller/chat.controller.js';
+import { addMember, getChatDetails, getMyChats, getMyGroups, groupChat, leaveFromGroup, remaneGroup, removeMember, sendAttachment } from '../controller/chat.controller.js';
 import { isAuthenticated } from '../auth/auth.js';
 import { attachment } from '../middleware/upload.js';
 
@@ -29,4 +29,6 @@ app.post('/message',attachment,isAuthenticated,sendAttachment)
 // get chat details
 app.get("/:id",isAuthenticated,getChatDetails)
 
+// remane group
+app.put("/:id",isAuthenticated,remaneGroup)
 export const chatRoute = app;

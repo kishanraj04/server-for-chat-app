@@ -293,3 +293,37 @@ export const sendAttachment = async (req, res, next) => {
   }
 };
 
+// get chat details
+export const getChatDetails = async(req,res,next) =>{
+  try {
+    if(req.query.populate=='"true"'){
+      const chat = await Chat.findById(req.params.id).populate("members","name avatar").lean()
+
+      if(!chat){
+        const err = new Error()
+        err.status=404
+        err.message="chat not found"
+      }
+
+      chat.members = chat?.members?.map(({_id,name,avatar})=>({_id,name,avatar:avatar?.url}))
+
+      return res.status(200).json({success:true,chat})
+    }else{
+      const chat = await Chat.findById({_id:req.params.id})
+      if(!chat){
+        const err = new Error()
+        err.status=404
+        err.message="chat not found"
+        return next(err)
+      }
+
+     return res.status(200).json({success:true,chat})
+    }
+  } catch (error) {
+    const err = new Error()
+    err.status=500
+    err.message=error.message
+    next(err)
+  }
+}
+
