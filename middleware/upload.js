@@ -21,3 +21,4 @@ const uploadFile = multer({
 });
 
 export const uploadAvatar = uploadFile.single("avatar");
+export const attachment = uploadFile.array("files",5);

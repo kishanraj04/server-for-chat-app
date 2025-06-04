@@ -1,6 +1,6 @@
-import { event } from "../constants/events.js";
 import { otherUser } from "../lib/helper.js";
 import { Chat } from "../models/chat.model.js";
+import { Message } from "../models/message.model.js";
 import { User } from "../models/user.model.js";
 import { emitEvent } from "../utils/chat.features.js";
 
@@ -19,7 +19,7 @@ export const groupChat = async (req, res, next) => {
     const allmembers = [...members, you?._id];
 
     const createdGroup = await Chat.create({
-        groupname,
+      groupname,
       user: you?.name,
       groupchat: true,
       members: allmembers,
@@ -124,18 +124,23 @@ export const addMember = async (req, res, next) => {
 
   // Fetch user data for new members
   const newMembersData = await Promise.all(
-    newMembers.map(id => User.findById(id, "name _id"))
+    newMembers.map((id) => User.findById(id, "name _id"))
   );
 
   // Remove duplicates: keep only those not already in chat.members
-  const existingMemberIds = chat.members.map(id => id.toString());
+  const existingMemberIds = chat.members.map((id) => id.toString());
 
   const uniqueMembersToAdd = newMembersData
-    .filter(user => user && !existingMemberIds.includes(user._id.toString()))
-    .map(user => user._id);
+    .filter((user) => user && !existingMemberIds.includes(user._id.toString()))
+    .map((user) => user._id);
 
   if (uniqueMembersToAdd.length === 0) {
-    return res.status(200).json({ success: false, message: "No new members added. All are already in the chat." });
+    return res
+      .status(200)
+      .json({
+        success: false,
+        message: "No new members added. All are already in the chat.",
+      });
   }
 
   // Add unique new members
@@ -143,41 +148,148 @@ export const addMember = async (req, res, next) => {
   await chat.save();
 
   const addedUsernames = newMembersData
-    .filter(user => uniqueMembersToAdd.includes(user._id))
-    .map(user => user.name)
+    .filter((user) => uniqueMembersToAdd.includes(user._id))
+    .map((user) => user.name)
     .join(", ");
 
   // Emit socket events
   emitEvent(req, "send", chat.members, `New user(s) ${addedUsernames} joined`);
   emitEvent(req, "refetch", chat.members);
 
-  res.status(200).json({ success: true, chat, message: "Members added successfully" });
+  res
+    .status(200)
+    .json({ success: true, chat, message: "Members added successfully" });
 };
 
 // remove members from group
-export const removeMember = async(req,res,next)=>{
-  const {chatId,userId} = req?.body
+export const removeMember = async (req, res, next) => {
+  const { chatId, userId } = req?.body;
   try {
-    const group = await Chat.findById({_id:chatId})
-    const username = await User.findById({_id:userId},"name")
-    if(!group){
-      return res.status(404).json({success:false,message:"group not found"})
+    const group = await Chat.findById({ _id: chatId });
+    const username = await User.findById({ _id: userId }, "name");
+    if (!group) {
+      return res
+        .status(404)
+        .json({ success: false, message: "group not found" });
     }
-    if(!userId || !chatId){
-      return res.status(404).json({success:false,message:"something missing"})
+    if (!userId || !chatId) {
+      return res
+        .status(404)
+        .json({ success: false, message: "something missing" });
     }
-    if(group?.members?.length<=3){
-      return res.status(500).json({success:false,message:"group at least have 3 member"})
+    if (group?.members?.length <= 3) {
+      return res
+        .status(500)
+        .json({ success: false, message: "group at least have 3 member" });
     }
-    group.members = group?.members?.filter((id)=>id?.toString()!=userId?.toString())
-    await group.save()
+    group.members = group?.members?.filter(
+      (id) => id?.toString() != userId?.toString()
+    );
+    await group.save();
 
-    emitEvent(req,"alert",group?.members,`user ${username} is removed`)
-    
-    emitEvent(req,"refetch",group?.members)
+    emitEvent(req, "alert", group?.members, `user ${username} is removed`);
 
-    res.status(200).json({success:true,message:"member deleted",group})
+    emitEvent(req, "refetch", group?.members);
+
+    res.status(200).json({ success: true, message: "member deleted", group });
   } catch (error) {
-    res.status(500).json({success:false,message:error?.message})
+    res.status(500).json({ success: false, message: error?.message });
   }
-}
+};
+
+// leave from group
+export const leaveFromGroup = async (req, res, next) => {
+  try {
+    const { gid } = req?.params;
+    const group = await Chat.findById({ _id: gid });
+    const userid = req?.user?._id;
+    if (!gid) {
+      const err = new Error();
+      err.status = 404;
+      err.message = "not a valid gorup";
+      next(err);
+    }
+    if (!group) {
+      const err = new Error();
+      err.status = 404;
+      err.message = "group not found";
+      next(err);
+    }
+    if (group?.creator == userid) {
+      const deletedGroup = await Chat.findByIdAndDelete({ _id: gid });
+
+      return res
+        .status(200)
+        .json({
+          success: true,
+          message: "admin destroyed this group",
+          deletedGroup,
+        });
+    }
+    group.members = group?.members?.filter(
+      (id) => id?.toString() != userid?.toString()
+    );
+    await group.save();
+
+    res.status(200).json({ success: true, message: "you leaved from group" });
+  } catch (error) {
+    next(error.message);
+  }
+};
+
+// send attachment and message
+export const sendAttachment = async (req, res, next) => {
+  try {
+    const { chatId } = req.body;
+
+    const userId = req?.user?._id;
+    const [chat, me] = await Promise.all([
+      Chat.findById({ _id: chatId }),
+      User.findById({ _id: userId }, "name"),
+    ]);
+    const files = req?.files || [];
+    if (!chat) {
+      const err = new Error();
+      err.status = 404;
+      err.message = "chat not found";
+      return next(err);
+    }
+    if (files.length < 1) {
+      const err = new Error();
+      err.status = 400;
+      err.message = "please provide attachment";
+      return next(err);
+    }
+
+    // upload here
+    const attachments = [];
+
+    // message for db
+    const messageForDb = {
+      content: "hiii",
+      attachments,
+      chat: chatId,
+      sender: {
+        _id: userId,
+        name: me?.name, 
+      },
+    };
+
+    const createdMessage = await Message.create(messageForDb);
+    console.log(createdMessage);
+
+    // emit event
+    emitEvent(req, "New attachment", chat.members, {
+      message: messageForDb,
+      chatId,
+    });
+
+    emitEvent(req, "new alert", chat.members, { chatId });
+    return res.status(200).json({ success: true, createdMessage });
+  } catch (error) {
+    const err = new Error()
+    err.status=500;
+    err.message=error.message
+  }
+};
+
