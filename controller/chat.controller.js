@@ -327,3 +327,40 @@ export const getChatDetails = async(req,res,next) =>{
   }
 }
 
+// rename froup
+export const remaneGroup = async(req,res,next)=>{
+  try {
+    const {chatId,name} = req.body
+    const chat = await Chat.findByIdAndUpdate({_id:chatId},{$set:{groupname:name}},{new:true})
+
+    if(!chat){
+      const err = new Error()
+      err.status=404
+      err.message="chat not found"
+      return next(err)
+    }
+
+    if(!chat?.groupchat)
+    {
+      const err = new Error()
+      err.status=400
+      err.message="not a group chat"
+      return next(err)
+    }
+    if(chat?.creator?.toString!=req?.user?._id?.toString()){
+      const err = new Error()
+      err.status=401
+      err.message="you cant change the group name"
+      return next(err)
+    }
+
+    emitEvent(req,"refetch chat",chat?.members)
+    return res.status(200).json({success:true,message:"renamed",chat})
+
+  } catch (error) {
+    const err = new Error()
+    err.status=500
+    err.message=error.message
+    return next(err)
+  }
+}
