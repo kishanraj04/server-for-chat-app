@@ -425,7 +425,7 @@ export const getMessages = async(req,res,next)=>{
     const limit = 20;
     const skip = (page-1)*limit
 
-    const [message,total_msg_count] = await Promise.all([Message.find({chat:chatId}).sort({createdAt:-1}).skip(skip).limit(limit).populate("sender","name").lean() , Message.countDocuments({chat:chatId})])
+    const [message,total_msg_count] = await Promise.all([Message.find({chat:chatId}).sort({createdAt:-1}).skip(skip).limit(limit).populate("sender","name").lean() , Message.countDocument({chat:chatId})])
   
     const totalPage = Math.ceil(total_msg_count/limit) || 0
 

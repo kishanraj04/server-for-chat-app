@@ -2,7 +2,7 @@ import express from 'express'
 import { addMember, deleteChat, getChatDetails, getMessages, getMyChats, getMyGroups, groupChat, leaveFromGroup, remaneGroup, removeMember, sendAttachment } from '../controller/chat.controller.js';
 import { isAuthenticated } from '../auth/auth.js';
 import { attachment } from '../middleware/upload.js';
-import { groupChatValidator, validateHandler } from '../lib/validator.js';
+import { addMemberValidator, groupChatValidator, removeMemberValidator, validateHandler } from '../lib/validator.js';
 
 const app = express.Router()
 
@@ -16,10 +16,10 @@ app.get('/my-chats',isAuthenticated,getMyChats)
 app.get("/my-groups",isAuthenticated,getMyGroups)
 
 // add memebers
-app.put("/add-members",isAuthenticated,addMember)
+app.put("/add-members",isAuthenticated,addMemberValidator(),validateHandler,addMember)
 
 // remove member
-app.delete('/remove/member',isAuthenticated,removeMember)
+app.delete('/remove/member',isAuthenticated,removeMemberValidator(),validateHandler,removeMember)
 
 // leave from group
 app.put('/leave/group/:gid',isAuthenticated,leaveFromGroup)
