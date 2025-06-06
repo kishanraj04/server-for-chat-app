@@ -8,7 +8,8 @@ const storage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     const ext = path.extname(file.originalname);
-    const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+    console.log(file.originalname);
+    const filename = `${file?.originalname}.${ext}`;
     cb(null, filename);
   },
 });

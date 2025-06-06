@@ -2,11 +2,12 @@ import express from 'express'
 import { addMember, deleteChat, getChatDetails, getMessages, getMyChats, getMyGroups, groupChat, leaveFromGroup, remaneGroup, removeMember, sendAttachment } from '../controller/chat.controller.js';
 import { isAuthenticated } from '../auth/auth.js';
 import { attachment } from '../middleware/upload.js';
+import { groupChatValidator, validateHandler } from '../lib/validator.js';
 
 const app = express.Router()
 
 // group chats
-app.post('/group-chat',isAuthenticated,groupChat)
+app.post('/group-chat',isAuthenticated,groupChatValidator(),validateHandler,groupChat)
 
 // get my chats
 app.get('/my-chats',isAuthenticated,getMyChats)
