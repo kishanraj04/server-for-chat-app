@@ -14,6 +14,7 @@ app.use(express.json());
 // cookie parser
 app.use(cookieParser())
 
+app.use(express.urlencoded({ extended: true }));
 
 // user route
 app.use("/api/v1/user", uploadAvatar, userRoute);

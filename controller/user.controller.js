@@ -14,20 +14,19 @@ export const registerUser = async (req, res) => {
   }
 
   const isuserexist = await User.findOne({ name: body?.name });
-
-  const filePath = req.file.path;
-
-  const cloudinaryresp = await cloudinary.uploader.upload(filePath,{folder:"avatar"})
-
-//   delte local file from dir
-   fs.unlink(filePath, (err) => {
-      if (err) console.error('Error deleting file:', err);
-    });
-
-
-  if (isuserexist) {
+   if (isuserexist) {
     return res.status(200).json({ success: false, message: "user exist" });
   }
+  const filePath = req.file.path;
+  console.log(filePath , body);
+  const cloudinaryresp = await cloudinary.uploader.upload(filePath,{folder:"avatar"})
+//   delte local file from dir
+  //  fs.unlink(filePath, (err) => {
+  //     if (err) console.error('Error deleting file:', err);
+  //   });
+
+
+ 
 
   const avatar = {
     public_id: cloudinaryresp?.public_id,
