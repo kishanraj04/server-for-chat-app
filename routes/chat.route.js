@@ -2,7 +2,7 @@ import express from 'express'
 import { addMember, deleteChat, getChatDetails, getMessages, getMyChats, getMyGroups, groupChat, leaveFromGroup, remaneGroup, removeMember, sendAttachment } from '../controller/chat.controller.js';
 import { isAuthenticated } from '../auth/auth.js';
 import { attachment } from '../middleware/upload.js';
-import { addMemberValidator, groupChatValidator, removeMemberValidator, validateHandler } from '../lib/validator.js';
+import { addMemberValidator, getMessagesValidator, groupChatValidator, leaveGroupValidator, removeMemberValidator, sendAttachmentValidator, validateHandler } from '../lib/validator.js';
 
 const app = express.Router()
 
@@ -22,10 +22,10 @@ app.put("/add-members",isAuthenticated,addMemberValidator(),validateHandler,addM
 app.delete('/remove/member',isAuthenticated,removeMemberValidator(),validateHandler,removeMember)
 
 // leave from group
-app.put('/leave/group/:gid',isAuthenticated,leaveFromGroup)
+app.put('/leave/group/:gid',isAuthenticated,leaveGroupValidator(),validateHandler,leaveFromGroup)
 
 // attachment and message
-app.post('/message',attachment,isAuthenticated,sendAttachment)
+app.post('/message',attachment,isAuthenticated, sendAttachmentValidator(),validateHandler,sendAttachment)
 
 // get chat details
 app.get("/:id",isAuthenticated,getChatDetails)
@@ -37,5 +37,6 @@ app.put("/:id",isAuthenticated,remaneGroup)
 app.delete("/:id",isAuthenticated,deleteChat)
 
 // get msgs
-app.get("/message/:id",isAuthenticated,getMessages)
+app.get("/message/:id",isAuthenticated,getMessagesValidator(),validateHandler,getMessages)
+
 export const chatRoute = app;
