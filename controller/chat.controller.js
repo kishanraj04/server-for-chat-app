@@ -2,7 +2,7 @@ import { otherUser } from "../lib/helper.js";
 import { Chat } from "../models/chat.model.js";
 import { Message } from "../models/message.model.js";
 import { User } from "../models/user.model.js";
-import { emitEvent } from "../utils/chat.features.js";
+import { deleteAttachments, emitEvent } from "../utils/chat.features.js";
 
 // group chat
 export const groupChat = async (req, res, next) => {
@@ -362,5 +362,57 @@ export const remaneGroup = async(req,res,next)=>{
     err.status=500
     err.message=error.message
     return next(err)
+  }
+}
+
+// delete chat
+export const deleteChat = async(req,res,next)=>{
+  try {
+    const chatId = req.params.id
+    const chat = await Chat.findById({_id:chatId});
+    if(!chat){
+      const err = new Error()
+      err.status=404;
+      err.message="chat not found"
+      return next(err)
+    }
+
+    const members = chat?.members
+    console.log(members);
+    if(chat?.groupchat && chat?.creator!=req?.user?._id){
+      const err = new Error()
+      err.status=401;
+      err.message="you are not allowed"
+      return next(err)
+    }
+
+    if(!chat?.groupchat && !chat?.members?.includes(req?.user?._id)){
+        const err = new Error()
+      err.status=401;
+      err.message="you are not allowed"
+      return next(err)
+    }
+
+    // here we delete all messages and attach.. from cloudinary
+    const msgandattachment = await Message.find({
+      chat:chatId
+    })
+    
+    const public_ids = [];
+    msgandattachment.forEach(({attachments}) => {
+      attachments?.forEach(({public_id})=>{
+        public_ids.push(public_id)
+      })     
+    });
+    await Promise.all([deleteAttachments(public_ids),Chat.deleteOne(),Message.deleteMany({chat:chatId})])
+
+    emitEvent(req,"refetch",members)
+
+    return res.status(200).json({success:true,message:"chat deleted"})
+  } catch (error) {
+    const err = new Error()
+    err.status=500
+    err.message=error.message
+    next(err)
   }
 }
