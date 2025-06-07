@@ -2,7 +2,7 @@ import express from 'express'
 import { addMember, deleteChat, getChatDetails, getMessages, getMyChats, getMyGroups, groupChat, leaveFromGroup, remaneGroup, removeMember, sendAttachment } from '../controller/chat.controller.js';
 import { isAuthenticated } from '../auth/auth.js';
 import { attachment } from '../middleware/upload.js';
-import { addMemberValidator, getMessagesValidator, groupChatValidator, leaveGroupValidator, removeMemberValidator, sendAttachmentValidator, validateHandler } from '../lib/validator.js';
+import { addMemberValidator, deleteChatValidator, getMessagesValidator, groupChatValidator, leaveGroupValidator, removeMemberValidator, sendAttachmentValidator, validateHandler } from '../lib/validator.js';
 
 const app = express.Router()
 
@@ -34,7 +34,7 @@ app.get("/:id",isAuthenticated,getChatDetails)
 app.put("/:id",isAuthenticated,remaneGroup)
 
 // delete chat
-app.delete("/:id",isAuthenticated,deleteChat)
+app.delete("/:id",isAuthenticated,deleteChatValidator(),validateHandler,deleteChat)
 
 // get msgs
 app.get("/message/:id",isAuthenticated,getMessagesValidator(),validateHandler,getMessages)
