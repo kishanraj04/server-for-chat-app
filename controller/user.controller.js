@@ -3,6 +3,8 @@ import cloudinaryconfig from "../connectdb/cloudinary.js";
 import {v2 as cloudinary} from 'cloudinary'
 import fs from "fs/promises";
 import { Chat } from "../models/chat.model.js";
+import { emitEvent } from "../utils/chat.features.js";
+import {Request} from "../models/request.model.js"
 
 // register user
 export const registerUser = async (req, res) => {
@@ -55,13 +57,41 @@ export const searchUser = async(req,res,next)=>{
     const {name} = req?.query
     const myChat =await Chat.find({groupchat:false,members:req?.user?._id})
     const allusers = myChat?.flatMap((chat)=>chat?.members)
-    console.log(allusers);
+ 
     const allusr_exp_me = await User?.find({_id:{$nin:allusers},name:{$regex:name,$options:"i"}})
-    console.log(allusr_exp_me);
+  
     const modifydata = allusr_exp_me?.map(({_id,name,avatar})=>({_id,name,avatar:avatar?.url}))
 
     return res.status(200).json({success:true,modifydata})
   } catch (error) {
     
+  }
+}
+
+// send request
+export const sendRequest = async(req,res,next)=>{
+  try {
+    const {userId} = req?.body
+    const request = await Request.findOne({$or:[{
+      sender:userId,receiver:req?.user?._id,
+      sender:req?.user?._id,receiver:userId
+    }]})
+    if(request){
+      const err = new Error()
+      err.status=400
+      err.message="request already send"
+      return next(err)
+    }
+
+    const makereq = await Request.create({sender:req?.user?._id,receiver:userId})
+
+    emitEvent(req,"new request",[userId])
+
+    res.status(200).json({success:true,message:"friend req send"})
+  } catch (error) {
+    const err = new Error()
+    err.status=500
+    err.message=error.message
+    return next(err)
   }
 }

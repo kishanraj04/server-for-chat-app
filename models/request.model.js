@@ -4,7 +4,7 @@ const requestSchema = mongoose.Schema({
     status:{
         type:String,
         default:"pending",
-        enum:["accepted","rejected"]
+        enum:["accepted","rejected","pending"]
     },
     sender:{
         type:mongoose.Types.ObjectId,

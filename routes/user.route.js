@@ -1,5 +1,5 @@
 import express from 'express'
-import { getMyProfile, registerUser, searchUser } from '../controller/user.controller.js'
+import { getMyProfile, registerUser, searchUser, sendRequest } from '../controller/user.controller.js'
 import { isLogin } from '../auth/login.js'
 import { directLogin } from '../auth/directlogin.js'
 import { isAuthenticated, logoutUser } from '../auth/auth.js'
@@ -28,4 +28,6 @@ app.get('/logout',logoutUser)
 // search user
 app.get('/search/user',isAuthenticated,searchUser)
 
+// send request
+app.put("/sendrequest",isAuthenticated,sendRequest)
 export const userRoute = app
