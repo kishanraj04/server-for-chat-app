@@ -95,3 +95,44 @@ export const sendRequest = async(req,res,next)=>{
     return next(err)
   }
 }
+
+// accept request
+export const acceptrequest = async(req,res,next)=>{
+  try {
+    const {requestId,accept} = req?.body
+    const request = await Request.find({_id:requestId}).populate("sender","name").populate("receiver","name")
+
+    if(!request){
+      const err = new Error()
+      err.status=404
+      err.message="request not found"
+      return next(err)
+    }
+
+    if(request?.receiver?.toString()!=req?.user?._id?.toString()){
+      const err = new Error()
+      err.status=401
+      err.message="you are not authorized"
+      return next(err)
+    }
+
+    if(!accept){
+      await request.deleteOne()
+      const err = new Error()
+      err.status=202
+      err.message="rejected"
+      return next(err)
+    }
+
+    // after accepted
+    const members = [request?.sender?._id,request?.receiver?._id]
+
+    await Promise.all([Chat.create({members,groupname:`${request?.sender?.name}-${request?.receiver?.name}`}),request.deleteOne()])
+
+    emitEvent(req,"refetch",members)
+
+    return res.status(200).json({success:true,message:"request accepted",senderId:request?.sender?._id})
+  } catch (error) {
+    
+  }
+}
