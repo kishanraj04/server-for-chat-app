@@ -5,6 +5,7 @@ import fs from "fs/promises";
 import { Chat } from "../models/chat.model.js";
 import { emitEvent } from "../utils/chat.features.js";
 import {Request} from "../models/request.model.js"
+import { otherUser } from "../lib/helper.js";
 
 // register user
 export const registerUser = async (req, res) => {
@@ -82,6 +83,12 @@ export const sendRequest = async(req,res,next)=>{
       err.message="request already send"
       return next(err)
     }
+    if(userId?.toString()==req?.user?._id?.toString()){
+      const err = new Error()
+      err.status=400
+      err.message="you cant send request to itself"
+      return next(err)
+    }
 
     const makereq = await Request.create({sender:req?.user?._id,receiver:userId})
 
@@ -100,16 +107,16 @@ export const sendRequest = async(req,res,next)=>{
 export const acceptrequest = async(req,res,next)=>{
   try {
     const {requestId,accept} = req?.body
-    const request = await Request.find({_id:requestId}).populate("sender","name").populate("receiver","name")
-
+    const request = await Request.findById({_id:requestId}).populate("sender","name").populate("receiver","name")
+     console.log(accept);
     if(!request){
       const err = new Error()
       err.status=404
       err.message="request not found"
       return next(err)
     }
-
-    if(request?.receiver?.toString()!=req?.user?._id?.toString()){
+   console.log(request);
+    if(request?.receiver?._id?.toString()!=req?.user?._id?.toString()){
       const err = new Error()
       err.status=401
       err.message="you are not authorized"
@@ -127,11 +134,62 @@ export const acceptrequest = async(req,res,next)=>{
     // after accepted
     const members = [request?.sender?._id,request?.receiver?._id]
 
-    await Promise.all([Chat.create({members,groupname:`${request?.sender?.name}-${request?.receiver?.name}`}),request.deleteOne()])
+    await Promise.all([Chat.create({user:request?.sender?.name,members,groupname:`${request?.sender?.name}-${request?.receiver?.name}`}),request.deleteOne()])
 
     emitEvent(req,"refetch",members)
 
     return res.status(200).json({success:true,message:"request accepted",senderId:request?.sender?._id})
+  } catch (error) {
+      const err = new Error()
+      err.status=400
+      err.message=error.message
+      return next(err)
+  }
+}
+
+// get my notigications
+export const getMyNotifications = async(req,res,next)=>{
+  try {
+    const requests = await Request.find({receiver:req?.user?._id}).populate("sender","name avatar")
+    const transformresp = requests.map(({_id,sender})=>({_id,
+      sender:{
+        _id:sender?._id,
+        name:sender?.name,
+        avatar:sender?.avatar?.url
+      }
+    }))
+
+    return res.status(200).json({success:true,transformresp})
+  } catch (error) {
+    
+  }
+}
+
+// get my friends
+export const getMyFriends = async(req,res,next)=>{
+  try {
+    const chatId = req?.query?.chatId
+    const chat = await Chat.find({members:req?.user?._id,groupchat:false}).populate("members","name avatar")
+
+    const firends = chat?.map(({members})=>{
+      const otheruser = otherUser(members,req?.user?._id)
+
+      return {
+        _id:otheruser?._id,
+        name:otheruser?.name,
+        avatar:otheruser?.avatar?.url 
+      }
+    })
+
+    if(chatId){
+       const chat = await Chat.findById({_id:chatId})
+       const availablefriends = firends?.filter((friend)=>!chat?.members?.includes(friend?._id))
+
+
+       return res.status(200).json({success:true,availablefriends})
+    }else{
+      res.status(200).json({success:true , firends})
+    }
   } catch (error) {
     
   }

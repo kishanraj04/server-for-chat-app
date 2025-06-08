@@ -6,6 +6,7 @@ import './utils/createfolder.js'
 import { errorHandler } from "./middleware/errorHandler.js";
 import cookieParser from "cookie-parser";
 import { chatRoute } from "./routes/chat.route.js";
+import { adminRoute } from "./routes/admin.route.js";
 const app = express();
 
 // parse body
@@ -20,7 +21,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api/v1/user", uploadAvatar, userRoute);
 // chat route
 app.use("/api/v1/chat",chatRoute) 
-
+// admin route
+app.use("/api/v1/admin",adminRoute)
 
 // err handler
 app.use(errorHandler)
