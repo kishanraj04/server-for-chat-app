@@ -1,5 +1,5 @@
 import express from 'express'
-import { allChats, allMessages, allUsers } from '../controller/admin.controller.js'
+import { allChats, allMessages, allUsers, getDashBoard } from '../controller/admin.controller.js'
 
 const app = express.Router()
 
@@ -11,4 +11,7 @@ app.get("/chats",allChats)
 
 // all messages
 app.get("/messages",allMessages)
+
+// dashboard
+app.get("/dashboard",getDashBoard)
 export const adminRoute = app

@@ -87,3 +87,47 @@ export const allMessages = async(req,res,next)=>{
 }
 
 }
+
+// dashboard
+export const getDashBoard = async (req, res, next) => {
+  try {
+    const [usercount, messagecount, groupcount, singlechat] = await Promise.all([
+      User.countDocuments({}),
+      Message.countDocuments({}),
+      Chat.countDocuments({ groupchat: true }),
+      Chat.countDocuments({ groupchat: false }),
+    ]);
+
+    // last 7 days messages
+    const today = new Date();
+    const last7days = new Date();
+    last7days.setDate(last7days.getDate() - 7);
+
+    const last7daysmsg = await Message.find({
+      createdAt: { $gte: last7days, $lte: today }
+    }).select("createdAt");
+
+    const msg = new Array(7).fill(0);
+
+    last7daysmsg.forEach(message => {
+      const diffInDays = Math.floor((today.getTime() - message.createdAt.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffInDays >= 0 && diffInDays < 7) {
+        msg[6 - diffInDays]++;
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      usercount,
+      messagecount,
+      groupcount,
+      singlechat,
+      message: msg
+    });
+
+  } catch (error) {
+    const err = new Error(error.message);
+    err.status = 500;
+    return next(err);
+  }
+};
