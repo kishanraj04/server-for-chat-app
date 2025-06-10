@@ -1,5 +1,5 @@
 import express from 'express'
-import { allChats, allUsers } from '../controller/admin.controller.js'
+import { allChats, allMessages, allUsers } from '../controller/admin.controller.js'
 
 const app = express.Router()
 
@@ -9,5 +9,6 @@ app.get("/users",allUsers)
 // all chats
 app.get("/chats",allChats)
 
-
+// all messages
+app.get("/messages",allMessages)
 export const adminRoute = app

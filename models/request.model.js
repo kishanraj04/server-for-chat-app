@@ -13,7 +13,7 @@ const requestSchema = mongoose.Schema({
     },
     receiver:{
         type:mongoose.Types.ObjectId,
-        red:"User",
+        ref:"User",
         required:true
     }
 })

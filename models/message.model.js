@@ -14,15 +14,11 @@ const messageSchema = mongoose.Schema({
     required: true
   },
   sender: {
-    _id: {
+    
       type: mongoose.Types.ObjectId,
       ref: "User",
       required: true
-    },
-    name: {
-      type: String,
-      required: true
-    }
+    
   },
   chat: {
     type: mongoose.Types.ObjectId,

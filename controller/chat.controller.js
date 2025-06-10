@@ -243,10 +243,13 @@ export const sendAttachment = async (req, res, next) => {
     const { chatId } = req.body;
 
     const userId = req?.user?._id;
+
+    console.log(chatId , userId);
     const [chat, me] = await Promise.all([
-      Chat.findById({ _id: chatId }),
+      Chat.find({ members: chatId }),
       User.findById({ _id: userId }, "name"),
     ]);
+
     const files = req?.files || [];
     if (!chat) {
       const err = new Error();
@@ -270,11 +273,10 @@ export const sendAttachment = async (req, res, next) => {
       attachments,
       chat: chatId,
       sender: {
-        _id: userId,
-        name: me?.name, 
+        _id: userId
       },
     };
-
+    console.log(messageForDb);
     const createdMessage = await Message.create(messageForDb);
     console.log(createdMessage);
 

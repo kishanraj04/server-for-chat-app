@@ -58,3 +58,32 @@ export const allChats = async (req, res, next) => {
     return next(err);
   }
 };
+
+// all messages
+export const allMessages = async(req,res,next)=>{
+    try {
+  const messages = await Message.find({}).populate("chat").populate("sender","name avatar")
+ 
+
+  const modifydata = messages.map(({ _id, content, attachments, sender, createdAt, chat }) => ({
+    _id,
+    attachments,
+    content,
+    createdAt,
+    chat: chat?._id,
+    groupchat: chat?.groupchat,
+    sender: {
+      _id: sender?._id,
+      name: sender?.name,
+      avatar: sender?.avatar?.url || null
+    }
+  }));
+
+  return res.status(200).json({ success: true, messages });
+} catch (error) {
+  const err = new Error(error.message || "Internal Server Error");
+  err.status = 500;
+  return next(err);
+}
+
+}
