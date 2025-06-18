@@ -1,6 +1,52 @@
 import { Chat } from "../models/chat.model.js";
 import { Message } from "../models/message.model.js";
 import { User } from "../models/user.model.js";
+import jwt from 'jsonwebtoken'
+
+// verify admin
+export const verifyAdmin = async(req,res,next)=>{
+  try {
+    const {secretkey} = req?.body
+
+    const iscorrest = secretkey === process.env.ADMINKEY
+    if(!iscorrest){
+      const err = new Error()
+      err.status=401
+      err.message="not authorized"
+      return next(err)
+    }
+    const admintoken = await jwt.sign(secretkey,process.env.ADMINKEY)
+    return res.status(200).cookie("admintoken",admintoken,{
+        httpOnly: true,
+        sameSite: "none",
+        maxAge: 24 * 60 * 60 * 1000,
+      }).json({success:true,message:"admin login"})
+  } catch (error) {
+    const err = new Error()
+    err.status=500
+    err.message=error.message
+    return next(err)
+  }
+}
+
+// logout admin
+export const logoutAdmin = async(req,res,next)=>{
+  try {
+     const token = req.cookies.admintoken
+    if(!token){
+        const err = new Error()
+        err.message="user already logout"
+        err.statue=200
+        return next(err)
+    }
+    res.status(200).clearCookie("admintoken","").json({success:true,message:"admin logout"});
+  } catch (error) {
+    const err = new Error()
+    err.status=500
+    err.message=error.message
+    return next(err)
+  }
+}
 
 // all user
 export const allUsers = async (req, res, next) => {
