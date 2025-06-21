@@ -1,60 +1,50 @@
 import express from "express";
-import { userRoute } from "./routes/user.route.js";
-import "./connectdb/connectdb.js";
-import { uploadAvatar } from "./middleware/upload.js";
-import "./utils/createfolder.js";
-import { errorHandler } from "./middleware/errorHandler.js";
+import { createServer } from "http";
+import { Server } from "socket.io";
 import cookieParser from "cookie-parser";
+import cors from "cors";
+import { v4 as uuid } from "uuid";
+import "./connectdb/connectdb.js";
+import "./utils/createfolder.js";
+import { userRoute } from "./routes/user.route.js";
+import { uploadAvatar } from "./middleware/upload.js";
+import { errorHandler } from "./middleware/errorHandler.js";
 import { chatRoute } from "./routes/chat.route.js";
 import { adminRoute } from "./routes/admin.route.js";
-import { createServer } from "http";
-import { v4 as uuid } from "uuid";
-import cors from "cors";
-import { Server } from "socket.io";
 import { getAllSockets } from "./helper/helper.js";
 import { Message } from "./models/message.model.js";
+import { socketAuthenticator } from "./auth/auth.js";
 
 const app = express();
 const server = createServer(app);
-const io = new Server(server, {});
 
-// parse body
-app.use(express.json());
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
 
-// cors
-app.use(cors({
-  origin:"http://localhost:5173",
-  credentials:true,
-  methods:["GET","POST","PUT","DELETE"]
-}))
+// ✅ Apply Socket Middleware
+io.use((socket, next) => {
+  // Apply cookie-parser manually to socket.request
+  cookieParser()(socket.request, {}, (err) => {
+    if (err) return next(err);
+    
+    // Now pass to your socketAuthenticator
+    socketAuthenticator(null, socket, next);
+  });
+});
 
-// cookie parser
-app.use(cookieParser());
-
-app.use(express.urlencoded({ extended: true }));
-
-app.get("/hii",(req,res)=>{
-  res.status(200).json({message:"hello"})
-})
-
-// user route
-app.use("/api/v1/user", uploadAvatar, userRoute);
-// chat route
-app.use("/api/v1/chat", chatRoute);
-// admin route
-app.use("/api/v1/admin", adminRoute);
-
+// ✅ Store user => socketId mapping
 const usersocketIds = new Map();
-// socket
 
-const tmpuser = {
-  _id: "6845b5fcbcfd72f8cc79eeb3",
-  name: "kishu",
-};
+// ✅ Socket Connection
 io.on("connection", (socket) => {
-  usersocketIds.set(tmpuser?._id, socket?.id);
-
-  console.log(usersocketIds);
+  const currUser = socket.user1;
+  // console.log("CU ", currUser);
+  usersocketIds.set(currUser?._id.toString(), socket.id);
 
   socket.on("NEW_MESSAGE", async ({ chatId, members, message }) => {
     const realtimemsg = {
@@ -62,45 +52,60 @@ io.on("connection", (socket) => {
       _id: uuid(),
       content: message,
       sender: {
-        _id: tmpuser?._id,
-        name: tmpuser?._id,
+        _id: currUser._id,
+        name: currUser.name,
       },
       createdAt: new Date()
     };
 
-    const dbmsg = {
-      content: message,
-      chat: chatId,
-      sender: tmpuser?._id,
-    };
-
     try {
-      await Message.create(dbmsg)
+      await Message.create({
+        content: message,
+        chat: chatId,
+        sender: currUser._id
+      });
     } catch (error) {
       console.log(error.message);
     }
 
     const userSockets = getAllSockets(members, usersocketIds);
-    io.to(userSockets).emit("NEW_MESSAGE",{
-      chatId,
-      message:realtimemsg
-    })
-
-    // alert notification
-    io.to(userSockets).emit("NOTIFICATION",{chatId})
+    io.to(userSockets).emit("NEW_MESSAGE", { chatId, message: realtimemsg });
+    io.to(userSockets).emit("NOTIFICATION", { chatId });
   });
 
   socket.on("disconnect", () => {
     console.log("user disconnected");
-    usersocketIds.delete(tmpuser?._id?.toString());
+    usersocketIds.delete(currUser._id.toString());
   });
 });
 
-// err handler
+// ✅ Middleware
+app.use(express.json());
+app.use(cookieParser());
+app.use(express.urlencoded({ extended: true }));
+
+// ✅ CORS for HTTP routes
+app.use(cors({
+  origin: "http://localhost:5173",
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE"]
+}));
+
+// ✅ Routes
+app.get("/hii", (req, res) => {
+  res.status(200).json({ message: "hello" });
+});
+
+app.use("/api/v1/user", uploadAvatar, userRoute);
+app.use("/api/v1/chat", chatRoute);
+app.use("/api/v1/admin", adminRoute);
+
+// ✅ Error Handler
 app.use(errorHandler);
 
+// ✅ Start Server
 server.listen(3000, () => {
-  console.log("sever listen on 3000");
+  console.log("server listening on port 3000");
 });
 
 export { usersocketIds };

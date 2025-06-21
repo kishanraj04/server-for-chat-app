@@ -3,7 +3,8 @@ import { Chat } from "../models/chat.model.js";
 import { Message } from "../models/message.model.js";
 import { User } from "../models/user.model.js";
 import { deleteAttachments, emitEvent } from "../utils/chat.features.js";
-
+import cloudinary from '../utils/cloudinary.js'
+import streamifier from "streamifier";
 // group chat
 export const groupChat = async (req, res, next) => {
   try {
@@ -39,34 +40,41 @@ export const groupChat = async (req, res, next) => {
 
 // get my chats
 export const getMyChats = async (req, res, next) => {
-  const chats = await Chat.find({ members: req?.user?._id }).populate(
-    "members",
-    "name avatar"
-  );
-
-  const transformchats = chats.map(({ _id, user, members, groupchat }) => {
-    const otheruser = otherUser(members, _id);
-
-    const avatars = groupchat
-      ? members.slice(0, 3).map(({ avatar }) => avatar?.url)
-      : [...otheruser?.avatar?.url];
-
-    const chatName = groupchat ? user : otheruser?.name;
-
+  try {
     const myId = req.user._id.toString();
 
-    return {
-      _id,
-      groupchat,
-      avatar: avatars,
-      name: chatName,
-      members: members
-        .filter((member) => member._id.toString() !== myId)
-        .map((member) => member._id.toString()), // Only include their _id as string
-    };
-  });
+    const chats = await Chat.find({ members: req.user._id }).populate(
+      "members",
+      "name avatar"
+    );
 
-  res.status(200).json({ success: true, transformchats });
+    const transformchats = chats.map(({ _id, user, members, groupchat }) => {
+      // Exclude the current user
+      const otherMembers = members.filter(
+        (member) => member._id.toString() !== myId
+      );
+
+      // Prepare avatars
+      const avatars = groupchat
+        ? members.slice(0, 3).map(({ avatar }) => avatar?.url) // group: top 3 members
+        : otherMembers.map(({ avatar }) => avatar?.url);       // personal: all others
+
+      // Prepare name
+      const chatName = groupchat ? user : otherMembers[0]?.name;
+
+      return {
+        _id,
+        groupchat,
+        avatar: avatars,
+        name: chatName,
+        members: otherMembers.map((member) => member._id.toString()),
+      };
+    });
+
+    res.status(200).json({ success: true, transformchats });
+  } catch (error) {
+    next(error);
+  }
 };
 
 // get my groups
@@ -237,63 +245,68 @@ export const leaveFromGroup = async (req, res, next) => {
   }
 };
 
-// send attachment and message
+
 export const sendAttachment = async (req, res, next) => {
   try {
     const { chatId } = req.body;
-
     const userId = req?.user?._id;
+    const chat = await Chat.findById(chatId);
 
-    console.log(chatId , userId);
-    const [chat, me] = await Promise.all([
-      Chat.find({ members: chatId }),
-      User.findById({ _id: userId }, "name"),
-    ]);
+    if (!chat) return next({ status: 404, message: "Chat not found" });
 
     const files = req?.files || [];
-    if (!chat) {
-      const err = new Error();
-      err.status = 404;
-      err.message = "chat not found";
-      return next(err);
-    }
-    if (files.length < 1) {
-      const err = new Error();
-      err.status = 400;
-      err.message = "please provide attachment";
-      return next(err);
-    }
+    if (files.length < 1) return next({ status: 400, message: "No attachments found" });
 
-    // upload here
+    // ✅ Upload each file to Cloudinary
+    const uploadToCloudinary = (file) => {
+      return new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            resource_type: "auto", // can be image, video, raw, etc.
+            folder: "chat_attachments",
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+        streamifier.createReadStream(file.buffer).pipe(uploadStream);
+      });
+    };
+
     const attachments = [];
+    for (const file of files) {
+      const result = await uploadToCloudinary(file);
+      attachments.push({
+        url: result.secure_url,
+        public_id: result.public_id,
+        resource_type: result.resource_type,
+        originalName: file.originalname,
+      });
+    }
 
-    // message for db
+    // ✅ Create message
     const messageForDb = {
-      content: "hiii",
+      content: "Sent an attachment",
       attachments,
       chat: chatId,
-      sender: {
-        _id: userId
-      },
+      sender: { _id: userId },
     };
-    console.log(messageForDb);
-    const createdMessage = await Message.create(messageForDb);
-    console.log(createdMessage);
 
-    // emit event
-    emitEvent(req, "New attachment", chat.members, {
-      message: messageForDb,
+    const createdMessage = await Message.create(messageForDb);
+
+    // ✅ Emit and Respond
+    emitEvent(req, "NEW_MESSAGE", chat.members, {
+      message: createdMessage,
       chatId,
     });
 
-    emitEvent(req, "new alert", chat.members, { chatId });
-    return res.status(200).json({ success: true, createdMessage });
+    return res.status(200).json({ success: true, message: createdMessage });
   } catch (error) {
-    const err = new Error()
-    err.status=500;
-    err.message=error.message
+    next({ status: 500, message: error.message });
   }
 };
+
 
 // get chat details
 export const getChatDetails = async(req,res,next) =>{
@@ -422,18 +435,19 @@ export const deleteChat = async(req,res,next)=>{
 // get messages
 export const getMessages = async(req,res,next)=>{
   try {
-    const chatId = req?.params?.id
+    const chatId = req?.params?.chatId
     const {page=1} = req?.query
+    console.log(chatId);
     const limit = 20;
     const skip = (page-1)*limit
 
-    const [message,total_msg_count] = await Promise.all([Message.find({chat:chatId}).sort({createdAt:-1}).skip(skip).limit(limit).populate("sender","name").lean() , Message.countDocument({chat:chatId})])
+    const [message,total_msg_count] = await Promise.all([Message.find({chat:chatId}).sort({createdAt:-1}).skip(skip).limit(limit).populate("sender","name").lean() , Message.countDocuments({chat:chatId})])
   
     const totalPage = Math.ceil(total_msg_count/limit) || 0
 
     return res.status(200).json({success:true,message:message.reverse(),totalPage})
 
   } catch (error) {
-    
+    console.log(error.message);
   }
 }

@@ -14,7 +14,7 @@ export const isLogin = async (req, res, next) => {
     }
 
     const isCorrect = await bcrypt.compare(password, isExistUser?.password);
-    console.log(isCorrect);
+    console.log("login page ",isCorrect);
 
     if (!isCorrect) {
       return next(error);

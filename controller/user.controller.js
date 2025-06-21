@@ -55,28 +55,41 @@ export const getMyProfile = async (req, res, next) => {
 // search use
 export const searchUser = async (req, res, next) => {
   try {
-    const { name } = req?.query;
-    const id = req?.user?._id;
-    const myChat = await Chat.find({
-      groupchat: false,
-      members: req?.user?._id,
-    });
-    const allusers = myChat?.flatMap((chat) => chat?.members);
+    const { name } = req.query;
+    const myId = req.user._id;
 
-    const allusr_exp_me = await User?.find({
-      _id: { $nin: [...allusers, id] },
+    // Step 1: Get all 1-on-1 chats of current user
+    const myChats = await Chat.find({
+      groupchat: false,
+      members: myId,
+    });
+
+    // Step 2: Get all member IDs from those chats (including self)
+    const connectedUserIds = new Set();
+    myChats.forEach((chat) => {
+      chat.members.forEach((memberId) => connectedUserIds.add(memberId.toString()));
+    });
+    connectedUserIds.add(myId.toString()); // Also exclude self
+
+    // Step 3: Search for users not in connectedUserIds and matching name
+    const users = await User.find({
+      _id: { $nin: Array.from(connectedUserIds) },
       name: { $regex: name, $options: "i" },
     });
 
-    const modifydata = allusr_exp_me?.map(({ _id, name, avatar }) => ({
+    // Step 4: Format response
+    const modifydata = users.map(({ _id, name, avatar }) => ({
       _id,
       name,
       avatar: avatar?.url,
     }));
 
     return res.status(200).json({ success: true, modifydata });
-  } catch (error) {}
+  } catch (error) {
+    next(error);
+  }
 };
+
 
 // send request
 export const sendRequest = async (req, res, next) => {
@@ -144,7 +157,7 @@ export const acceptrequest = async (req, res, next) => {
       err.message = "you are not authorized";
       return next(err);
     }
-    console.log(typeof accept);
+    // console.log(typeof accept);
     if (!isAccepted) {
       console.log("rejected");
       await request.deleteOne();
@@ -250,25 +263,27 @@ export const allRequest = async (req, res, next) => {
 };
 
 // remove request
-export const removeRequest = async(req,res,next)=>{
+export const removeRequest = async (req, res, next) => {
   try {
-    const {requestId} = req.body
-    console.log(requestId);
-    const deleteRequest = await Request.findByIdAndDelete({_id:requestId},{new:true})
-    console.log(deleteRequest);
-    if(!deleteRequest){
-      const err = new Error()
-      err.status=404
-      err.message="Not Found"
-      return next(err)
+    const { _id } = req.body;
+    console.log("Deleting request with receiver:", _id);
+
+    const deletedRequest = await Request.findOneAndDelete({ receiver: _id });
+
+    if (!deletedRequest) {
+      const err = new Error("Request not found");
+      err.status = 404;
+      return next(err);
     }
 
-    res.status(200).json({success:true,message:"request deleted",deleteRequest})
-
+    res.status(200).json({
+      success: true,
+      message: "Request deleted",
+      deletedRequest,
+    });
   } catch (error) {
-      const err = new Error()
-      err.status=500
-      err.message=error.message
-      return next(err)
+    const err = new Error(error.message);
+    err.status = 500;
+    return next(err);
   }
-}
+};

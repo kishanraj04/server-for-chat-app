@@ -44,6 +44,6 @@ app.get("/myfriends",isAuthenticated,getMyFriends)
 app.get("/all-request",isAuthenticated,allRequest)
 
 // remove request
-app.post("/request/remove",isAuthenticated,removeRequest)
+app.delete("/remove/request",isAuthenticated,removeRequest)
 
 export const userRoute = app

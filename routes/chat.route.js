@@ -37,7 +37,7 @@ app.put("/:id",isAuthenticated,remaneGroup)
 app.delete("/:id",isAuthenticated,deleteChatValidator(),validateHandler,deleteChat)
 
 // get msgs
-app.get("/message/:id",isAuthenticated,getMessagesValidator(),validateHandler,getMessages)
+app.get("/message/:chatId",isAuthenticated,getMessagesValidator(),validateHandler,getMessages)
 
 
 export const chatRoute = app;
