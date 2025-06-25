@@ -1,7 +1,10 @@
+import { sockets, usersocketIds } from "../app.js";
+import { getAllSockets } from "../helper/helper.js";
+
 // emit the event
 export const emitEvent = (req,evnet,user,data)=>{
-    console.log("event emitting",evnet);
-
+    
+    console.log("user soc ",sockets,user,usersocketIds);
 }
 
 

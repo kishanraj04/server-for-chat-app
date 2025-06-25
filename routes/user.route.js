@@ -1,5 +1,5 @@
 import express from 'express'
-import { acceptrequest,  allRequest,  getMyFriends,  getMyNotifications, getMyProfile, registerUser, removeRequest, searchUser, sendRequest } from '../controller/user.controller.js'
+import { acceptrequest,  allRequest,  getMyFriends,  getMyNotifications, getMyProfile, getTotalNotification, registerUser, removeRequest, searchUser, sendRequest } from '../controller/user.controller.js'
 import { isLogin } from '../auth/login.js'
 import { directLogin } from '../auth/directlogin.js'
 import { isAuthenticated, logoutUser } from '../auth/auth.js'
@@ -45,5 +45,8 @@ app.get("/all-request",isAuthenticated,allRequest)
 
 // remove request
 app.delete("/remove/request",isAuthenticated,removeRequest)
+
+// get total notification
+app.get("/notificatio",isAuthenticated,getTotalNotification)
 
 export const userRoute = app

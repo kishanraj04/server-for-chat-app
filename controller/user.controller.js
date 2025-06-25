@@ -6,6 +6,7 @@ import { Chat } from "../models/chat.model.js";
 import { emitEvent } from "../utils/chat.features.js";
 import { Request } from "../models/request.model.js";
 import { otherUser } from "../lib/helper.js";
+import { Notification } from "../models/notification_alert.js";
 
 // register user
 export const registerUser = async (req, res) => {
@@ -287,3 +288,18 @@ export const removeRequest = async (req, res, next) => {
     return next(err);
   }
 };
+
+// get totalnotification
+export const getTotalNotification = async(req,res,next)=>{
+  try {
+    
+    const totalNotification = await Notification.find({})
+
+    res.status(200).json({success:true,totalNotification})
+  } catch (error) {
+    const err = new Error()
+    err.status=500
+    err.message=error.message
+    return next(err)
+  }
+}

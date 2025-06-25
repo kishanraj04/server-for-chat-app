@@ -1,9 +1,11 @@
+import { usersocketIds } from "../app.js";
+import { getAllSockets } from "../helper/helper.js";
 import { otherUser } from "../lib/helper.js";
 import { Chat } from "../models/chat.model.js";
 import { Message } from "../models/message.model.js";
 import { User } from "../models/user.model.js";
 import { deleteAttachments, emitEvent } from "../utils/chat.features.js";
-import cloudinary from '../utils/cloudinary.js'
+import cloudinary from "../utils/cloudinary.js";
 import streamifier from "streamifier";
 // group chat
 export const groupChat = async (req, res, next) => {
@@ -57,7 +59,7 @@ export const getMyChats = async (req, res, next) => {
       // Prepare avatars
       const avatars = groupchat
         ? members.slice(0, 3).map(({ avatar }) => avatar?.url) // group: top 3 members
-        : otherMembers.map(({ avatar }) => avatar?.url);       // personal: all others
+        : otherMembers.map(({ avatar }) => avatar?.url); // personal: all others
 
       // Prepare name
       const chatName = groupchat ? user : otherMembers[0]?.name;
@@ -143,12 +145,10 @@ export const addMember = async (req, res, next) => {
     .map((user) => user._id);
 
   if (uniqueMembersToAdd.length === 0) {
-    return res
-      .status(200)
-      .json({
-        success: false,
-        message: "No new members added. All are already in the chat.",
-      });
+    return res.status(200).json({
+      success: false,
+      message: "No new members added. All are already in the chat.",
+    });
   }
 
   // Add unique new members
@@ -226,13 +226,11 @@ export const leaveFromGroup = async (req, res, next) => {
     if (group?.creator == userid) {
       const deletedGroup = await Chat.findByIdAndDelete({ _id: gid });
 
-      return res
-        .status(200)
-        .json({
-          success: true,
-          message: "admin destroyed this group",
-          deletedGroup,
-        });
+      return res.status(200).json({
+        success: true,
+        message: "admin destroyed this group",
+        deletedGroup,
+      });
     }
     group.members = group?.members?.filter(
       (id) => id?.toString() != userid?.toString()
@@ -245,7 +243,6 @@ export const leaveFromGroup = async (req, res, next) => {
   }
 };
 
-
 export const sendAttachment = async (req, res, next) => {
   try {
     const { chatId } = req.body;
@@ -255,14 +252,15 @@ export const sendAttachment = async (req, res, next) => {
     if (!chat) return next({ status: 404, message: "Chat not found" });
 
     const files = req?.files || [];
-    if (files.length < 1) return next({ status: 400, message: "No attachments found" });
+    if (files.length < 1)
+      return next({ status: 400, message: "No attachments found" });
 
     // ✅ Upload each file to Cloudinary
     const uploadToCloudinary = (file) => {
       return new Promise((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           {
-            resource_type: "auto", // can be image, video, raw, etc.
+            resource_type: "auto", 
             folder: "chat_attachments",
           },
           (error, result) => {
@@ -287,167 +285,208 @@ export const sendAttachment = async (req, res, next) => {
 
     // ✅ Create message
     const messageForDb = {
-      content: "Sent an attachment",
+      content: "",
       attachments,
       chat: chatId,
       sender: { _id: userId },
     };
-
     const createdMessage = await Message.create(messageForDb);
 
-    // ✅ Emit and Respond
-    emitEvent(req, "NEW_MESSAGE", chat.members, {
-      message: createdMessage,
-      chatId,
+    const io = req.app.get("io");
+
+    // Emit with custom sender object
+    const messageToSend = {
+      ...createdMessage.toObject(), // convert to plain object
+      sender: {
+        _id: createdMessage.sender,
+        name: req?.user?.name,
+      },
+    };
+
+    // Send to all members
+    const userSockets = getAllSockets(chat.members);
+    io.to(userSockets).emit("NEW_MESSAGE", {
+      chatId: chatId,
+      message: messageToSend,
     });
 
-    return res.status(200).json({ success: true, message: createdMessage });
+    console.log(messageToSend);
+
+    return res
+      .status(200)
+      .json({
+        success: true,
+        message: {
+          ...createdMessage,
+          sender: { _id: createdMessage?.sender, name: req?.user?.name },
+        },
+      });
   } catch (error) {
     next({ status: 500, message: error.message });
   }
 };
 
-
 // get chat details
-export const getChatDetails = async(req,res,next) =>{
+export const getChatDetails = async (req, res, next) => {
   try {
-    if(req.query.populate=='"true"'){
-      const chat = await Chat.findById(req.params.id).populate("members","name avatar").lean()
+    if (req.query.populate == '"true"') {
+      const chat = await Chat.findById(req.params.id)
+        .populate("members", "name avatar")
+        .lean();
 
-      if(!chat){
-        const err = new Error()
-        err.status=404
-        err.message="chat not found"
+      if (!chat) {
+        const err = new Error();
+        err.status = 404;
+        err.message = "chat not found";
       }
 
-      chat.members = chat?.members?.map(({_id,name,avatar})=>({_id,name,avatar:avatar?.url}))
+      chat.members = chat?.members?.map(({ _id, name, avatar }) => ({
+        _id,
+        name,
+        avatar: avatar?.url,
+      }));
 
-      return res.status(200).json({success:true,chat})
-    }else{
-      const chat = await Chat.findById({_id:req.params.id})
-      if(!chat){
-        const err = new Error()
-        err.status=404
-        err.message="chat not found"
-        return next(err)
+      return res.status(200).json({ success: true, chat });
+    } else {
+      const chat = await Chat.findById({ _id: req.params.id });
+      if (!chat) {
+        const err = new Error();
+        err.status = 404;
+        err.message = "chat not found";
+        return next(err);
       }
 
-     return res.status(200).json({success:true,chat})
+      return res.status(200).json({ success: true, chat });
     }
   } catch (error) {
-    const err = new Error()
-    err.status=500
-    err.message=error.message
-    next(err)
+    const err = new Error();
+    err.status = 500;
+    err.message = error.message;
+    next(err);
   }
-}
+};
 
 // rename froup
-export const remaneGroup = async(req,res,next)=>{
+export const remaneGroup = async (req, res, next) => {
   try {
-    const {chatId,name} = req.body
-    const chat = await Chat.findByIdAndUpdate({_id:chatId},{$set:{groupname:name}},{new:true})
+    const { chatId, name } = req.body;
+    const chat = await Chat.findByIdAndUpdate(
+      { _id: chatId },
+      { $set: { groupname: name } },
+      { new: true }
+    );
 
-    if(!chat){
-      const err = new Error()
-      err.status=404
-      err.message="chat not found"
-      return next(err)
+    if (!chat) {
+      const err = new Error();
+      err.status = 404;
+      err.message = "chat not found";
+      return next(err);
     }
 
-    if(!chat?.groupchat)
-    {
-      const err = new Error()
-      err.status=400
-      err.message="not a group chat"
-      return next(err)
+    if (!chat?.groupchat) {
+      const err = new Error();
+      err.status = 400;
+      err.message = "not a group chat";
+      return next(err);
     }
-    if(chat?.creator?.toString!=req?.user?._id?.toString()){
-      const err = new Error()
-      err.status=401
-      err.message="you cant change the group name"
-      return next(err)
+    if (chat?.creator?.toString != req?.user?._id?.toString()) {
+      const err = new Error();
+      err.status = 401;
+      err.message = "you cant change the group name";
+      return next(err);
     }
 
-    emitEvent(req,"refetch chat",chat?.members)
-    return res.status(200).json({success:true,message:"renamed",chat})
-
+    emitEvent(req, "refetch chat", chat?.members);
+    return res.status(200).json({ success: true, message: "renamed", chat });
   } catch (error) {
-    const err = new Error()
-    err.status=500
-    err.message=error.message
-    return next(err)
+    const err = new Error();
+    err.status = 500;
+    err.message = error.message;
+    return next(err);
   }
-}
+};
 
 // delete chat
-export const deleteChat = async(req,res,next)=>{
+export const deleteChat = async (req, res, next) => {
   try {
-    const chatId = req.params.id
-    const chat = await Chat.findById({_id:chatId});
-    if(!chat){
-      const err = new Error()
-      err.status=404;
-      err.message="chat not found"
-      return next(err)
+    const chatId = req.params.id;
+    const chat = await Chat.findById({ _id: chatId });
+    if (!chat) {
+      const err = new Error();
+      err.status = 404;
+      err.message = "chat not found";
+      return next(err);
     }
 
-    const members = chat?.members
+    const members = chat?.members;
     console.log(members);
-    if(chat?.groupchat && chat?.creator!=req?.user?._id){
-      const err = new Error()
-      err.status=401;
-      err.message="you are not allowed"
-      return next(err)
+    if (chat?.groupchat && chat?.creator != req?.user?._id) {
+      const err = new Error();
+      err.status = 401;
+      err.message = "you are not allowed";
+      return next(err);
     }
 
-    if(!chat?.groupchat && !chat?.members?.includes(req?.user?._id)){
-        const err = new Error()
-      err.status=401;
-      err.message="you are not allowed"
-      return next(err)
+    if (!chat?.groupchat && !chat?.members?.includes(req?.user?._id)) {
+      const err = new Error();
+      err.status = 401;
+      err.message = "you are not allowed";
+      return next(err);
     }
 
     // here we delete all messages and attach.. from cloudinary
     const msgandattachment = await Message.find({
-      chat:chatId
-    })
-    
-    const public_ids = [];
-    msgandattachment.forEach(({attachments}) => {
-      attachments?.forEach(({public_id})=>{
-        public_ids.push(public_id)
-      })     
+      chat: chatId,
     });
-    await Promise.all([deleteAttachments(public_ids),Chat.deleteOne(),Message.deleteMany({chat:chatId})])
 
-    emitEvent(req,"refetch",members)
+    const public_ids = [];
+    msgandattachment.forEach(({ attachments }) => {
+      attachments?.forEach(({ public_id }) => {
+        public_ids.push(public_id);
+      });
+    });
+    await Promise.all([
+      deleteAttachments(public_ids),
+      Chat.deleteOne(),
+      Message.deleteMany({ chat: chatId }),
+    ]);
 
-    return res.status(200).json({success:true,message:"chat deleted"})
+    emitEvent(req, "refetch", members);
+
+    return res.status(200).json({ success: true, message: "chat deleted" });
   } catch (error) {
-    const err = new Error()
-    err.status=500
-    err.message=error.message
-    next(err)
+    const err = new Error();
+    err.status = 500;
+    err.message = error.message;
+    next(err);
   }
-}
+};
 
 // get messages
-export const getMessages = async(req,res,next)=>{
+export const getMessages = async (req, res, next) => {
   try {
-    const chatId = req?.params?.chatId
-    const {page=1} = req?.query
+    const chatId = req?.params?.chatId;
+    const { page = 1 } = req?.query;
     console.log(chatId);
     const limit = 20;
-    const skip = (page-1)*limit
+    const skip = (page - 1) * limit;
 
-    const [message,total_msg_count] = await Promise.all([Message.find({chat:chatId}).sort({createdAt:-1}).skip(skip).limit(limit).populate("sender","name").lean() , Message.countDocuments({chat:chatId})])
-  
-    const totalPage = Math.ceil(total_msg_count/limit) || 0
+    const [message, total_msg_count] = await Promise.all([
+      Message.find({ chat: chatId })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("sender", "name")
+        .lean(),
+      Message.countDocuments({ chat: chatId }),
+    ]);
 
-    return res.status(200).json({success:true,message:message.reverse(),totalPage})
+    const totalPage = Math.ceil(total_msg_count / limit) || 0;
 
+    return res
+      .status(200)
+      .json({ success: true, message: message.reverse(), totalPage });
   } catch (error) {
     console.log(error.message);
   }
-}
+};
